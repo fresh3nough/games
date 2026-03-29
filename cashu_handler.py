@@ -157,27 +157,35 @@ class CashuHandler:
             logger.error(f"Token receive failed: {e}")
             return 0, ""
 
-    async def send_token(self, amount: int, mint_url: str = "") -> str:
+    async def send_token(self, amount: int, mint_url: str = "") -> tuple[str, int]:
         """
         Generate a Cashu send token for the given amount.
         Sends from the specified mint (or house mint if omitted).
-        Returns the token string, or empty string on failure.
+        Falls back to sending the available balance if the full
+        amount cannot be covered.
+        Returns (token_string, amount_sent). Both empty/zero on failure.
         """
         if amount <= 0:
-            return ""
+            return "", 0
         try:
             wallet = await self._wallet_for_mint(mint_url or self.mint_url)
             await wallet.load_proofs(reload=True)
+            available = sum_proofs(wallet.proofs)
+
+            # If we can't cover the full payout, send whatever we have
+            send_amount = min(amount, available)
+            if send_amount <= 0:
+                return "", 0
 
             send_proofs, _ = await wallet.select_to_send(
-                wallet.proofs, amount, set_reserved=True,
+                wallet.proofs, send_amount, set_reserved=True,
             )
             token_str = await wallet.serialize_proofs(send_proofs)
-            logger.info(f"Generated payout token for {amount} sat from {wallet.url}")
-            return token_str
+            logger.info(f"Generated payout token for {send_amount} sat from {wallet.url}")
+            return token_str, send_amount
         except Exception as e:
             logger.error(f"Token send failed: {e}")
-            return ""
+            return "", 0
 
     async def get_balance(self) -> int:
         """Return the total house wallet balance across all mints."""

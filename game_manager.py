@@ -83,18 +83,16 @@ class GameManager:
 
         if won:
             payout = bet_amount * multiplier
-            payout_token = await self.cashu.send_token(payout, bet_mint)
-            if payout_token:
-                return (
-                    f"{name} bet {bet_amount} sat on {bet_type}. "
-                    f"Ball landed on {result_str}. YOU WIN {payout} sat!\n"
-                    f"Payout: {payout_token}"
-                )
-            return (
+            payout_token, paid = await self.cashu.send_token(payout, bet_mint)
+            msg = (
                 f"{name} bet {bet_amount} sat on {bet_type}. "
-                f"Ball landed on {result_str}. YOU WIN {payout} sat! "
-                "(Payout pending -- house balance low)"
+                f"Ball landed on {result_str}. YOU WIN {payout} sat!"
             )
+            if payout_token:
+                if paid < payout:
+                    msg += f" (Partial payout: {paid} of {payout} sat)"
+                return msg + f"\nPayout: {payout_token}"
+            return msg
         return (
             f"{name} bet {bet_amount} sat on {bet_type}. "
             f"Ball landed on {result_str}. You lose."
@@ -165,10 +163,10 @@ class GameManager:
         """Settle a finished hangman game (pay out or keep tokens)."""
         payout = game.payout_amount()
         if payout > 0:
-            token = await self.cashu.send_token(payout, game.bet_mint)
+            token, paid = await self.cashu.send_token(payout, game.bet_mint)
             if token:
-                return f"\nPayout ({payout} sat): {token}"
-            return f"\nYou won {payout} sat! (Payout pending -- house balance low)"
+                label = f"{paid} of {payout} sat" if paid < payout else f"{payout} sat"
+                return f"\nPayout ({label}): {token}"
         return ""
 
     # ── Blackjack (21) ────────────────────────────────────────────
@@ -242,8 +240,8 @@ class GameManager:
         """Settle a finished blackjack game."""
         payout = game.payout_amount()
         if payout > 0:
-            token = await self.cashu.send_token(payout, game.bet_mint)
+            token, paid = await self.cashu.send_token(payout, game.bet_mint)
             if token:
-                return f"\nPayout ({payout} sat): {token}"
-            return f"\nYou won {payout} sat! (Payout pending -- house balance low)"
+                label = f"{paid} of {payout} sat" if paid < payout else f"{payout} sat"
+                return f"\nPayout ({label}): {token}"
         return ""
