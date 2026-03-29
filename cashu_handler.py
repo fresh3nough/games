@@ -188,10 +188,16 @@ class CashuHandler:
             return "", 0
 
     async def get_balance(self) -> int:
-        """Return the total house wallet balance across all mints."""
+        """Return the total house wallet balance across all mints.
+        Restores from the mint first so externally-minted proofs
+        (e.g. Lightning top-ups via cashu.me) are included."""
         try:
             wallet = await self._get_wallet()
-            # Load proofs from every keyset in the DB, not just the house mint
+            # Restore proofs the mint knows about but our local DB does not
+            await wallet.restore_wallet_from_mnemonic(wallet.mnemonic, to=2, batch=25)
+            await wallet.load_proofs(reload=True, all_keysets=True)
+            # Invalidate spent proofs so balance is accurate
+            await wallet.invalidate(wallet.proofs, check_spendable=True)
             await wallet.load_proofs(reload=True, all_keysets=True)
             return sum_proofs(wallet.proofs)
         except Exception as e:
