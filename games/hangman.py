@@ -22,11 +22,12 @@ PAYOUT_MULTIPLIER = 3
 class HangmanGame:
     """Single hangman round for one player."""
 
-    def __init__(self, bet_amount: int):
+    def __init__(self, bet_amount: int, bet_mint: str = ""):
         self.word = random.choice(WORD_LIST)
         self.guessed = set()
         self.wrong = 0
         self.bet = bet_amount
+        self.bet_mint = bet_mint  # mint URL the bet came from
         self.finished = False
         self.won = False
 

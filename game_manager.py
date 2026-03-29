@@ -72,7 +72,7 @@ class GameManager:
         if not token:
             return f"{name}: Include a Cashu token to bet. " + roulette.HELP_TEXT
 
-        bet_amount = await self.cashu.receive_token(token)
+        bet_amount, bet_mint = await self.cashu.receive_token(token)
         if bet_amount <= 0:
             return f"{name}: Could not redeem that token. Check it is valid and unspent."
 
@@ -83,7 +83,7 @@ class GameManager:
 
         if won:
             payout = bet_amount * multiplier
-            payout_token = await self.cashu.send_token(payout)
+            payout_token = await self.cashu.send_token(payout, bet_mint)
             if payout_token:
                 return (
                     f"{name} bet {bet_amount} sat on {bet_type}. "
@@ -149,11 +149,11 @@ class GameManager:
         if sender in hangman.active_games and not hangman.active_games[sender].finished:
             return f"{name}: Finish your current game first! {hangman.active_games[sender].display()}"
 
-        bet_amount = await self.cashu.receive_token(token)
+        bet_amount, bet_mint = await self.cashu.receive_token(token)
         if bet_amount <= 0:
             return f"{name}: Could not redeem that token."
 
-        game = HangmanGame(bet_amount)
+        game = HangmanGame(bet_amount, bet_mint)
         hangman.active_games[sender] = game
         return (
             f"{name}: Hangman started! Bet: {bet_amount} sat | "
@@ -165,7 +165,7 @@ class GameManager:
         """Settle a finished hangman game (pay out or keep tokens)."""
         payout = game.payout_amount()
         if payout > 0:
-            token = await self.cashu.send_token(payout)
+            token = await self.cashu.send_token(payout, game.bet_mint)
             if token:
                 return f"\nPayout ({payout} sat): {token}"
             return f"\nYou won {payout} sat! (Payout pending -- house balance low)"
@@ -222,11 +222,11 @@ class GameManager:
         if sender in blackjack.active_games and not blackjack.active_games[sender].finished:
             return f"{name}: Finish your current hand first! Type !21 hit or !21 stand"
 
-        bet_amount = await self.cashu.receive_token(token)
+        bet_amount, bet_mint = await self.cashu.receive_token(token)
         if bet_amount <= 0:
             return f"{name}: Could not redeem that token."
 
-        game = BlackjackGame(bet_amount)
+        game = BlackjackGame(bet_amount, bet_mint)
         blackjack.active_games[sender] = game
         msg = game.initial_state()
         result = f"{name}: {msg}"
@@ -242,7 +242,7 @@ class GameManager:
         """Settle a finished blackjack game."""
         payout = game.payout_amount()
         if payout > 0:
-            token = await self.cashu.send_token(payout)
+            token = await self.cashu.send_token(payout, game.bet_mint)
             if token:
                 return f"\nPayout ({payout} sat): {token}"
             return f"\nYou won {payout} sat! (Payout pending -- house balance low)"

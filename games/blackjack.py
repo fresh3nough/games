@@ -51,8 +51,9 @@ def format_hand(hand: list) -> str:
 class BlackjackGame:
     """A single blackjack round for one player."""
 
-    def __init__(self, bet_amount: int):
+    def __init__(self, bet_amount: int, bet_mint: str = ""):
         self.bet = bet_amount
+        self.bet_mint = bet_mint  # mint URL the bet came from
         self.deck = self._new_deck()
         random.shuffle(self.deck)
 

@@ -119,67 +119,72 @@ class CashuHandler:
         except Exception as e:
             logger.warning(f"Wallet init note: {e}")
 
-    async def receive_token(self, token: str) -> int:
+    async def _wallet_for_mint(self, mint_url: str) -> Wallet:
+        """Return a wallet instance pointed at the given mint,
+        seeded with the house mnemonic so all proofs are recoverable."""
+        house_wallet = await self._get_wallet()
+        if mint_url == self.mint_url:
+            return house_wallet
+
+        wallet = await Wallet.with_db(
+            mint_url,
+            os.path.join(self.cashu_dir, "wallet"),
+            unit="sat",
+        )
+        await wallet._migrate_database()
+        await wallet._init_private_key(house_wallet.mnemonic)
+        await wallet.load_proofs(reload=True)
+        await wallet.load_mint()
+        return wallet
+
+    async def receive_token(self, token: str) -> tuple[int, str]:
         """
         Receive a Cashu token into the house wallet.
         Handles cross-mint tokens by connecting to the token's mint.
-        Returns the amount received in sats, or 0 on failure.
+        Returns (amount_sats, mint_url) on success, or (0, "") on failure.
         """
         try:
             token_obj = deserialize_token_from_string(token)
             token_mint = token_obj.mint
             amount = token_obj.amount
 
-            # Get the house wallet mnemonic so cross-mint receives
-            # derive proofs from the same seed (recoverable).
-            house_wallet = await self._get_wallet()
-            mnemonic = house_wallet.mnemonic
-
-            # Build a wallet pointed at the token's mint, seeded
-            # with the same mnemonic as the house wallet.
-            recv_wallet = await Wallet.with_db(
-                token_mint,
-                os.path.join(self.cashu_dir, "wallet"),
-                unit=token_obj.unit or "sat",
-            )
-            await recv_wallet._migrate_database()
-            await recv_wallet._init_private_key(mnemonic)
-            await recv_wallet.load_proofs(reload=True)
+            recv_wallet = await self._wallet_for_mint(token_mint)
             await cashu_receive(recv_wallet, token_obj)
 
             logger.info(f"Received {amount} sat from {token_mint}")
-            return amount
+            return amount, token_mint
         except Exception as e:
             logger.error(f"Token receive failed: {e}")
-            return 0
+            return 0, ""
 
-    async def send_token(self, amount: int) -> str:
+    async def send_token(self, amount: int, mint_url: str = "") -> str:
         """
         Generate a Cashu send token for the given amount.
+        Sends from the specified mint (or house mint if omitted).
         Returns the token string, or empty string on failure.
         """
         if amount <= 0:
             return ""
         try:
-            wallet = await self._get_wallet()
+            wallet = await self._wallet_for_mint(mint_url or self.mint_url)
             await wallet.load_proofs(reload=True)
-            await wallet.load_mint()
 
             send_proofs, _ = await wallet.select_to_send(
                 wallet.proofs, amount, set_reserved=True,
             )
             token_str = await wallet.serialize_proofs(send_proofs)
-            logger.info(f"Generated payout token for {amount} sat")
+            logger.info(f"Generated payout token for {amount} sat from {wallet.url}")
             return token_str
         except Exception as e:
             logger.error(f"Token send failed: {e}")
             return ""
 
     async def get_balance(self) -> int:
-        """Return the current house wallet balance in sats."""
+        """Return the total house wallet balance across all mints."""
         try:
             wallet = await self._get_wallet()
-            await wallet.load_proofs(reload=True)
+            # Load proofs from every keyset in the DB, not just the house mint
+            await wallet.load_proofs(reload=True, all_keysets=True)
             return sum_proofs(wallet.proofs)
         except Exception as e:
             logger.error(f"Balance check failed: {e}")
