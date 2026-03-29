@@ -74,7 +74,7 @@ class GameManager:
 
         bet_amount, bet_mint = await self.cashu.receive_token(token)
         if bet_amount <= 0:
-            return f"{name}: Could not redeem that token. Check it is valid and unspent."
+            return ""
 
         # Spin the wheel
         result = roulette.spin()
@@ -151,7 +151,7 @@ class GameManager:
 
         bet_amount, bet_mint = await self.cashu.receive_token(token)
         if bet_amount <= 0:
-            return f"{name}: Could not redeem that token."
+            return ""
 
         game = HangmanGame(bet_amount, bet_mint)
         hangman.active_games[sender] = game
@@ -224,7 +224,7 @@ class GameManager:
 
         bet_amount, bet_mint = await self.cashu.receive_token(token)
         if bet_amount <= 0:
-            return f"{name}: Could not redeem that token."
+            return ""
 
         game = BlackjackGame(bet_amount, bet_mint)
         blackjack.active_games[sender] = game

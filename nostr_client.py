@@ -88,6 +88,8 @@ class NostrClient:
         self._connections = {}
         self._sub_id = os.urandom(8).hex()
         self._running = True
+        self._seen_events: set[str] = set()  # dedup event IDs across relays
+        self._seen_max = 2000  # cap to avoid unbounded memory
 
     async def connect(self):
         """Connect to all relays and listen for messages."""
@@ -147,6 +149,15 @@ class NostrClient:
                 # Skip our own messages
                 if event.get("pubkey") == self.public_key_hex:
                     continue
+                # Deduplicate events seen on multiple relays
+                eid = event.get("id", "")
+                if eid in self._seen_events:
+                    continue
+                self._seen_events.add(eid)
+                if len(self._seen_events) > self._seen_max:
+                    # Evict oldest half to stay bounded
+                    to_keep = list(self._seen_events)[self._seen_max // 2:]
+                    self._seen_events = set(to_keep)
                 await self._handle_event(event)
 
             elif msg_type == "EOSE":
