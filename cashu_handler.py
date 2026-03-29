@@ -86,8 +86,26 @@ class CashuHandler:
                 os.path.join(self.cashu_dir, "wallet"),
                 unit="sat",
             )
-            await init_wallet(wallet)
+
+            # If we have a saved mnemonic in secrets, restore from it;
+            # otherwise init_wallet generates a new one.
+            secrets = Config.load_secrets()
+            saved_mnemonic = secrets.get("wallet_mnemonic")
+            if saved_mnemonic:
+                await wallet._migrate_database()
+                await wallet._init_private_key(saved_mnemonic)
+                await wallet.load_proofs(reload=True)
+            else:
+                await init_wallet(wallet)
+
             await wallet.load_mint()
+
+            # Persist the mnemonic to secrets.txt so the user can
+            # import the wallet into cashu.me or recover funds.
+            if hasattr(wallet, "mnemonic") and wallet.mnemonic:
+                Config.save_wallet_mnemonic(wallet.mnemonic)
+                logger.info("Wallet mnemonic saved to secrets.txt")
+
             self._wallet = wallet
         return self._wallet
 
@@ -112,13 +130,21 @@ class CashuHandler:
             token_mint = token_obj.mint
             amount = token_obj.amount
 
-            # Build a wallet pointed at the token's mint
+            # Get the house wallet mnemonic so cross-mint receives
+            # derive proofs from the same seed (recoverable).
+            house_wallet = await self._get_wallet()
+            mnemonic = house_wallet.mnemonic
+
+            # Build a wallet pointed at the token's mint, seeded
+            # with the same mnemonic as the house wallet.
             recv_wallet = await Wallet.with_db(
                 token_mint,
                 os.path.join(self.cashu_dir, "wallet"),
                 unit=token_obj.unit or "sat",
             )
-            await init_wallet(recv_wallet)
+            await recv_wallet._migrate_database()
+            await recv_wallet._init_private_key(mnemonic)
+            await recv_wallet.load_proofs(reload=True)
             await cashu_receive(recv_wallet, token_obj)
 
             logger.info(f"Received {amount} sat from {token_mint}")

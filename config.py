@@ -52,3 +52,18 @@ class Config:
         with open(Config.SECRETS_FILE, "w") as f:
             json.dump(data, f, indent=2)
         os.chmod(Config.SECRETS_FILE, 0o600)
+
+    @staticmethod
+    def save_wallet_mnemonic(mnemonic: str):
+        """Persist the Cashu wallet mnemonic (seed phrase) to secrets.txt.
+
+        This allows the operator to import the house wallet into
+        cashu.me or any BIP-39 compatible Cashu wallet to access funds.
+        """
+        data = Config.load_secrets()
+        if data.get("wallet_mnemonic") == mnemonic:
+            return  # already saved
+        data["wallet_mnemonic"] = mnemonic
+        with open(Config.SECRETS_FILE, "w") as f:
+            json.dump(data, f, indent=2)
+        os.chmod(Config.SECRETS_FILE, 0o600)

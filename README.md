@@ -4,6 +4,8 @@ A Python bot that connects to [BitChat](https://github.com/permissionlesstech/bi
 
 ## Games
 
+https://21mint.me
+
 - **!roulette** -- European roulette (0-36). Bet on colors, parity, ranges, or straight numbers.
 - **!hangman** -- Guess the hidden word letter by letter before running out of tries.
 - **!21** -- Blackjack. Beat the dealer without going over 21.
