@@ -7,8 +7,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 class Config:
-    # Default Cashu mint (test mint -- not real sats)
-    DEFAULT_MINT_URL = "https://testnut.cashu.space"
+    # Default Cashu mint
+    DEFAULT_MINT_URL = "https://21mint.me"
 
     # House wallet directory (stores ecash proofs locally)
     HOUSE_WALLET_DIR = os.path.join(BASE_DIR, "house_wallet")
