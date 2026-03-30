@@ -110,21 +110,27 @@ class CashuHandler:
         return self._wallet
 
     async def initialize(self):
-        """Ensure the house wallet directory exists and is reachable.
-        Runs a one-time restore from the mint so externally-minted
-        proofs (e.g. Lightning top-ups) are available immediately."""
+        """Ensure the house wallet directory exists and is reachable."""
         os.makedirs(self.cashu_dir, exist_ok=True)
         try:
             wallet = await self._get_wallet()
-            # One-time restore: pull any proofs the mint knows about
-            # that our local DB missed (e.g. funds added via cashu.me)
-            await wallet.restore_wallet_from_mnemonic(wallet.mnemonic, to=2, batch=25)
-            await wallet.load_proofs(reload=True, all_keysets=True)
-            await wallet.invalidate(wallet.proofs, check_spendable=True)
             logger.info(f"House wallet ready at {self.cashu_dir}")
             logger.info(f"Mint: {self.mint_url}")
         except Exception as e:
             logger.warning(f"Wallet init note: {e}")
+
+    async def restore(self) -> int:
+        """Restore proofs from the mint that the local DB missed
+        (e.g. Lightning top-ups via cashu.me). Returns new balance.
+        Should only be called manually (!restore) when the bot is
+        idle -- it resets the secret counter and must not race with
+        receive/send operations."""
+        wallet = await self._get_wallet()
+        await wallet.restore_wallet_from_mnemonic(wallet.mnemonic, to=2, batch=25)
+        await wallet.load_proofs(reload=True, all_keysets=True)
+        await wallet.invalidate(wallet.proofs, check_spendable=True)
+        await wallet.load_proofs(reload=True, all_keysets=True)
+        return sum_proofs(wallet.proofs)
 
     async def _wallet_for_mint(self, mint_url: str) -> Wallet:
         """Return a wallet instance pointed at the given mint,

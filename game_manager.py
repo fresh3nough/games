@@ -48,6 +48,12 @@ class GameManager:
         elif cmd == "!balance":
             bal = await self.cashu.get_balance()
             return f"House balance: {bal} sat"
+        elif cmd == "!restore":
+            try:
+                bal = await self.cashu.restore()
+                return f"Wallet restored. House balance: {bal} sat"
+            except Exception as e:
+                return f"Restore failed: {e}"
 
         return ""
 
